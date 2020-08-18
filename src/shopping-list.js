@@ -1,6 +1,7 @@
-import $ from 'jquery';
+import $, { data } from 'jquery';
 
 import store from './store';
+import api from './api';
 
 const generateItemElement = function (item) {
   let itemTitle = `<span class="shopping-item shopping-item__checked">${item.name}</span>`;
@@ -50,8 +51,24 @@ const handleNewItemSubmit = function () {
     event.preventDefault();
     const newItemName = $('.js-shopping-list-entry').val();
     $('.js-shopping-list-entry').val('');
-    store.addItem(newItemName);
-    render();
+
+    // New Call Here
+    let error;
+    api.createItem(newItemName).then(function (myRequest) {
+      if(!myRequest.ok){
+        error = {code: myRequest.status};
+      }
+      return myRequest.json();
+    }).then(function (data) {
+      if(error){
+        error.message = data.message;
+        //throw new Error(error);
+        alert(error.message);
+        return Promise.reject(error);
+      }
+      store.addItem(data);
+      render();
+    });
   });
 };
 
@@ -67,9 +84,11 @@ const handleDeleteItemClicked = function () {
     // get the index of the item in store.items
     const id = getItemIdFromElement(event.currentTarget);
     // delete the item
-    store.findAndDelete(id);
+    api.deleteItem(id).then(function(){
+      store.findAndDelete(id);
+      render();
+    });
     // render the updated shopping list
-    render();
   });
 };
 
@@ -78,16 +97,24 @@ const handleEditShoppingItemSubmit = function () {
     event.preventDefault();
     const id = getItemIdFromElement(event.currentTarget);
     const itemName = $(event.currentTarget).find('.shopping-item').val();
-    store.findAndUpdateName(id, itemName);
-    render();
+    api.updateItem(id, {name: itemName})
+      .then(function() {
+        store.findAndUpdate(id,{name: itemName});
+        render();
+      });
   });
 };
 
 const handleItemCheckClicked = function () {
   $('.js-shopping-list').on('click', '.js-item-toggle', event => {
     const id = getItemIdFromElement(event.currentTarget);
-    store.findAndToggleChecked(id);
-    render();
+    //store.findAndToggleChecked(id);
+    let item = store.findById(id);
+    api.updateItem(item.id, {checked: !item.checked})
+      .then(function (){
+        store.findAndUpdate(id, {checked: !item.checked});
+        render();
+      });
   });
 };
 
